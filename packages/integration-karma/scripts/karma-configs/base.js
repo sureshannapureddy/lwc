@@ -24,6 +24,7 @@ const WIRE_SERVICE = getModulePath('wire-service', 'iife', 'es2017', 'dev');
 const WIRE_SERVICE_COMPAT = getModulePath('wire-service', 'iife', 'es5', 'dev');
 
 const POLYFILL_COMPAT = require.resolve('es5-proxy-compat/polyfills.js');
+const BROWSER_ENV = require.resolve('../../helpers/browser-env');
 const TEST_UTILS = require.resolve('../../helpers/test-utils');
 const WIRE_SETUP = require.resolve('../../helpers/wire-setup');
 
@@ -66,6 +67,7 @@ function getFiles(lwcConfig) {
     frameworkFiles.push(createPattern(WIRE_SETUP));
 
     return [
+        createPattern(BROWSER_ENV),
         ...frameworkFiles,
         createPattern(TEST_UTILS),
         createPattern('**/*.spec.js', { watched: false }),

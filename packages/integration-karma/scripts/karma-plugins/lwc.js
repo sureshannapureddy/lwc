@@ -66,7 +66,7 @@ function createPreprocessor(config, emitter, logger) {
 
                 // Rollup should not attempt to resolve the engine and the test utils, Karma takes care of injecting it
                 // globally in the page before running the tests.
-                external: ['lwc', 'wire-service', 'test-utils', '@test/loader'],
+                external: ['lwc', 'wire-service', 'test-utils', 'browser-env', '@test/loader'],
             });
 
             watcher.watchSuite(input, bundle.watchFiles);
@@ -84,6 +84,7 @@ function createPreprocessor(config, emitter, logger) {
                     lwc: 'LWC',
                     'wire-service': 'WireService',
                     'test-utils': 'TestUtils',
+                    'browser-env': 'BrowserEnv',
                 },
 
                 intro,
