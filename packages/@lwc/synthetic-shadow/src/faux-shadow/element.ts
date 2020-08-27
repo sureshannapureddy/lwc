@@ -344,52 +344,54 @@ function lastElementChildGetterPatched(this: ParentNode) {
     return children.item(children.length - 1) || null;
 }
 
-defineProperties(HTMLElement.prototype, {
-    innerText: {
-        get(this: Element): string {
-            if (!featureFlags.ENABLE_ELEMENT_PATCH) {
-                if (isNodeShadowed(this) || isHostElement(this)) {
-                    return innerTextPatched.call(this);
-                }
-
-                return innerTextGetter.call(this);
+defineProperty(HTMLElement.prototype, 'innerText', {
+    get(this: Element): string {
+        if (!featureFlags.ENABLE_ELEMENT_PATCH) {
+            if (isNodeShadowed(this) || isHostElement(this)) {
+                return innerTextPatched.call(this);
             }
 
-            // TODO [#1222]: remove global bypass
-            if (isGlobalPatchingSkipped(this)) {
-                return innerTextGetter.call(this);
-            }
-            return innerTextPatched.call(this);
-        },
-        set(v: string) {
-            innerTextSetter.call(this, v);
-        },
-        enumerable: true,
-        configurable: true,
+            return innerTextGetter.call(this);
+        }
+
+        // TODO [#1222]: remove global bypass
+        if (isGlobalPatchingSkipped(this)) {
+            return innerTextGetter.call(this);
+        }
+        return innerTextPatched.call(this);
     },
-    outerText: {
-        get(this: Element): string {
-            if (!featureFlags.ENABLE_ELEMENT_PATCH) {
-                if (isNodeShadowed(this) || isHostElement(this)) {
-                    return innerTextPatched.call(this);
-                }
-
-                return outerTextGetter.call(this);
-            }
-
-            // TODO [#1222]: remove global bypass
-            if (isGlobalPatchingSkipped(this)) {
-                return outerTextGetter.call(this);
-            }
-            return innerTextPatched.call(this);
-        },
-        set(v: string) {
-            outerTextSetter.call(this, v);
-        },
-        enumerable: true,
-        configurable: true,
+    set(v: string) {
+        innerTextSetter.call(this, v);
     },
+    enumerable: true,
+    configurable: true,
 });
+
+// Note: Firefox does not have outerText, https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/outerText
+if (outerTextGetter !== null && outerTextSetter !== null) {
+    defineProperty(HTMLElement.prototype, 'outerText', {
+        get(this: Element): string {
+            if (!featureFlags.ENABLE_ELEMENT_PATCH) {
+                if (isNodeShadowed(this) || isHostElement(this)) {
+                    return innerTextPatched.call(this);
+                }
+
+                return outerTextGetter!.call(this);
+            }
+
+            // TODO [#1222]: remove global bypass
+            if (isGlobalPatchingSkipped(this)) {
+                return outerTextGetter!.call(this);
+            }
+            return innerTextPatched.call(this);
+        },
+        set(v: string) {
+            outerTextSetter!.call(this, v);
+        },
+        enumerable: true,
+        configurable: true,
+    });
+}
 
 // Non-deep-traversing patches: this descriptor map includes all descriptors that
 // do not five access to nodes beyond the immediate children.

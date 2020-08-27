@@ -50,11 +50,15 @@ const innerTextDescriptor = getOwnPropertyDescriptor(HTMLElement.prototype, 'inn
 const innerTextGetter: (this: Element) => string = innerTextDescriptor!.get!;
 const innerTextSetter: (this: Element, s: string) => void = innerTextDescriptor!.set!;
 
-// @todo: Firefox does not have outerText.
+// Note: Firefox does not have outerText, https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/outerText
 const outerTextDescriptor = getOwnPropertyDescriptor(HTMLElement.prototype, 'outerText');
 
-const outerTextGetter: (this: Element) => string = outerTextDescriptor!.get!;
-const outerTextSetter: (this: Element, s: string) => void = outerTextDescriptor!.set!;
+const outerTextGetter: ((this: Element) => string) | null = outerTextDescriptor
+    ? outerTextDescriptor.get!
+    : null;
+const outerTextSetter: ((this: Element, s: string) => void) | null = outerTextDescriptor
+    ? outerTextDescriptor.set!
+    : null;
 
 const innerHTMLDescriptor = hasOwnProperty.call(Element.prototype, 'innerHTML')
     ? getOwnPropertyDescriptor(Element.prototype, 'innerHTML')
