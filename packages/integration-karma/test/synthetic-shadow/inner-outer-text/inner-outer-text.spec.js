@@ -7,7 +7,6 @@ if (!process.env.NATIVE_SHADOW) {
         document.body.appendChild(elm);
 
         return Promise.resolve().then(() => {
-
             it('should remove consecutive LF in between from partial results', () => {
                 const testCase = elm.shadowRoot.querySelector('.consecutive-LF');
 
@@ -39,7 +38,9 @@ end`);
             });
 
             it('should return empty when childNodes are hidden', () => {
-                const testCase = elm.shadowRoot.querySelector('.empty-inner-text-due-hidden-children');
+                const testCase = elm.shadowRoot.querySelector(
+                    '.empty-inner-text-due-hidden-children'
+                );
 
                 expect(testCase.innerText).toBe(``);
             });
@@ -47,7 +48,8 @@ end`);
             it('should collect text from multiple levels', () => {
                 const testCase = elm.shadowRoot.querySelector('.collect-text-multiple-levels');
 
-                expect(testCase.innerText).toBe(`This is, a text that should be displayed, in one line. It includes links.
+                expect(testCase.innerText)
+                    .toBe(`This is, a text that should be displayed, in one line. It includes links.
 
 Also paragraphs
 
@@ -103,13 +105,19 @@ and then another text`);
                 it('should process custom elements light dom', () => {
                     const testElement = elm.shadowRoot.querySelector('.with-slotted-content');
 
-                    expect(testElement.outerText).toBe('first text\n\nslotted element\n\nsecond text');
+                    expect(testElement.outerText).toBe(
+                        'first text\n\nslotted element\n\nsecond text'
+                    );
                 });
 
                 it('should process custom elements light dom across multiple shadows', () => {
-                    const testElement = elm.shadowRoot.querySelector('.with-slotted-content-2-levels');
+                    const testElement = elm.shadowRoot.querySelector(
+                        '.with-slotted-content-2-levels'
+                    );
 
-                    expect(testElement.outerText).toBe('first text\n\nslotted element\n\nsecond text');
+                    expect(testElement.outerText).toBe(
+                        'first text\n\nslotted element\n\nsecond text'
+                    );
                 });
             });
         });

@@ -7,7 +7,6 @@
 import {
     ArrayFilter,
     ArrayFind,
-    ArrayPush,
     ArraySlice,
     defineProperties,
     defineProperty,
@@ -37,17 +36,12 @@ import {
     getElementsByTagNameNS as elementGetElementsByTagNameNS,
     innerHTMLGetter,
     innerHTMLSetter,
-    innerTextGetter,
-    innerTextSetter,
     lastElementChildGetter,
     outerHTMLSetter,
     outerHTMLGetter,
-    outerTextGetter,
-    outerTextSetter,
     querySelectorAll as elementQuerySelectorAll,
     shadowRootGetter as originalShadowRootGetter,
 } from '../env/element';
-import { windowGetComputedStyle, windowGetSelection } from '../env/window';
 import { createStaticNodeList } from '../shared/static-node-list';
 import { createStaticHTMLCollection } from '../shared/static-html-collection';
 import {
@@ -55,240 +49,16 @@ import {
     getInternalChildNodes,
     hasMountedChildren,
     getNodeNearestOwnerKey,
-    textContentGetterPatched,
-    childNodesGetterPatched,
 } from './node';
 import { getOuterHTML } from '../3rdparty/polymer/outer-html';
-import { arrayFromCollection, getOwnerWindow, isGlobalPatchingSkipped } from '../shared/utils';
+import { arrayFromCollection, isGlobalPatchingSkipped } from '../shared/utils';
 import { getNodeOwnerKey, isNodeShadowed } from '../faux-shadow/node';
 import { assignedSlotGetterPatched } from './slot';
 import { getNonPatchedFilteredArrayOfNodes } from './no-patch-utils';
-import { ELEMENT_NODE, TEXT_NODE } from '../env/node';
 
 enum ShadowDomSemantic {
     Disabled,
     Enabled,
-}
-
-/**
- * Start of innerText Utility functions.
- */
-type InnerTextCollectionResult = string | number;
-
-function getElementComputedStyle(element: Element): CSSStyleDeclaration {
-    const win = getOwnerWindow(element);
-
-    return windowGetComputedStyle.call(win, element);
-}
-
-function getWindowSelection(node: Node): Selection | null {
-    const win = getOwnerWindow(node);
-
-    return windowGetSelection.call(win);
-}
-
-function nodeIsBeingRendered(nodeComputedStyle: CSSStyleDeclaration): boolean {
-    return nodeComputedStyle.visibility !== 'hidden' && nodeComputedStyle.display !== 'none';
-}
-
-type SelectionState = {
-    element: Element;
-    onselect: ((this: GlobalEventHandlers, ev: Event) => any) | null;
-    onselectionchange: ((this: GlobalEventHandlers, ev: Event) => any) | null;
-    onselectstart: ((this: GlobalEventHandlers, ev: Event) => any) | null;
-    ranges: Range[];
-};
-function getSelectionState(element: Element): SelectionState | null {
-    const win = getOwnerWindow(element);
-    const selection = getWindowSelection(element);
-
-    if (selection === null) {
-        return null;
-    }
-
-    const ranges: Range[] = [];
-    for (let i = 0; i < selection.rangeCount; i++) {
-        ranges.push(selection.getRangeAt(i));
-    }
-
-    const state: SelectionState = {
-        element,
-        onselect: win.onselect,
-        onselectstart: win.onselectstart,
-        onselectionchange: win.onselectionchange,
-        ranges,
-    };
-    win.onselect = null;
-    win.onselectstart = null;
-    win.onselectionchange = null;
-
-    return state;
-}
-
-function restoreSelectionState(state: SelectionState | null) {
-    if (state === null) {
-        return;
-    }
-
-    const { element, onselect, onselectstart, onselectionchange, ranges } = state;
-
-    const win = getOwnerWindow(element);
-    const selection = getWindowSelection(element)!;
-
-    selection.removeAllRanges();
-    for (let i = 0; i < ranges.length; i++) {
-        selection.addRange(ranges[i]);
-    }
-
-    win.onselect = onselect;
-    win.onselectstart = onselectstart;
-    win.onselectionchange = onselectionchange;
-}
-
-/**
- * Gets the "innerText" of a text node using the Selection API
- *
- * NOTE: For performance reasons, since this function will be called multiple times while calculating the innerText of
- *       an element, it does not restore the current selection.
- * @param textNode
- */
-function getTextNodeInnerText(textNode: Node): string {
-    const selection = getWindowSelection(textNode);
-
-    if (selection === null) {
-        return textNode.textContent || '';
-    }
-
-    selection.removeAllRanges();
-    const range = document.createRange();
-    range.selectNodeContents(textNode);
-    selection.addRange(range);
-    const text = selection.toString();
-
-    return text;
-}
-
-const nodeIsElement = (node: Node): node is Element => node.nodeType === ELEMENT_NODE;
-
-function innerTextCollectionSteps(node: Node): InnerTextCollectionResult[] {
-    const result: InnerTextCollectionResult[] = [];
-
-    node.childNodes.forEach((childNode) => {
-        ArrayPush.apply(result, innerTextCollectionSteps(childNode));
-    });
-
-    if (nodeIsElement(node)) {
-        const tagName = node.tagName;
-        const computedStyle = getElementComputedStyle(node);
-
-        // 2. If node's computed value of 'visibility' is not 'visible', then return items.
-        if (computedStyle.visibility !== 'visible') {
-            return result;
-        }
-
-        // 3. If node is not being rendered, then return items. @todo: handle exceptions: select, optgroup, option
-        if (
-            !nodeIsBeingRendered(computedStyle) &&
-            tagName !== 'SELECT' &&
-            tagName !== 'OPTGROUP' &&
-            tagName !== 'OPTION'
-        ) {
-            return result;
-        }
-
-        // 5. If node is a br element, then append a string containing a single U+000A LINE FEED (LF) character to items.
-        if (tagName === 'BR') {
-            result.push('\n');
-        }
-
-        // 6. If node's computed value of 'display' is 'table-cell', and node's CSS box is not the last 'table-cell' box of its enclosing 'table-row' box, then append a string containing a single U+0009 CHARACTER TABULATION (tab) character to items.
-        if (computedStyle.display === 'table-cell') {
-            // omitting case: and node's CSS box is not the last 'table-cell' box of its enclosing 'table-row' box
-            result.push('\t');
-        }
-
-        // 7. If node's computed value of 'display' is 'table-row', and node's CSS box is not the last 'table-row' box of the nearest ancestor 'table' box, then append a string containing a single U+000A LINE FEED (LF) character to items.
-        if (computedStyle.display === 'table-row') {
-            // omitting case: and node's CSS box is not the last 'table-row' box of the nearest ancestor 'table' box
-            result.push('\n');
-        }
-
-        // 8. If node is a p element, then append 2 (a required line break count) at the beginning and end of items.
-        if (tagName === 'P') {
-            result.unshift(2);
-            result.push(2);
-        }
-
-        // 9. If node's used value of 'display' is block-level or 'table-caption', then append 1 (a required line break count) at the beginning and end of items.
-        if (computedStyle.display === 'block' || computedStyle.display === 'table-caption') {
-            result.unshift(1);
-            result.push(1);
-        }
-    } else if (node.nodeType === TEXT_NODE) {
-        result.push(getTextNodeInnerText(node));
-    }
-
-    return result;
-}
-
-/**
- * innerText spec: https://html.spec.whatwg.org/multipage/dom.html#the-innertext-idl-attribute
- */
-function innerTextPatched(this: Element): string {
-    const thisComputedStyle = getElementComputedStyle(this);
-    // 1. If this is not being rendered or if the user agent is a non-CSS user agent, then return this's descendant text content.
-    if (!nodeIsBeingRendered(thisComputedStyle)) {
-        return textContentGetterPatched.call(this);
-    }
-
-    const selectionState = getSelectionState(this);
-
-    // 2. Let results be a new empty list.
-    let results: InnerTextCollectionResult[] = [];
-    // 3. For each child node node of this:
-    const childNodes = childNodesGetterPatched.call(this);
-    childNodes.forEach((childNode) => {
-        //   3.1 Let current be the list resulting in running the inner text collection steps with node. Each item in results will either be a string or a positive integer (a required line break count).
-        //   3.2 For each item item in current, append item to results.
-        ArrayPush.apply(results, innerTextCollectionSteps(childNode));
-    });
-
-    restoreSelectionState(selectionState);
-
-    // 4. Remove any items from results that are the empty string.
-    results = results.filter((result) => typeof result === 'number' || result.length > 0);
-
-    // 5. Remove any runs of consecutive required line break count items at the start or end of results.
-    let start = 0;
-    let end = results.length - 1;
-    let maxInSequence;
-    let elementInnerText = '';
-
-    while (typeof results[start] === 'number' && start <= end) start++;
-    while (typeof results[end] === 'number' && end > start) end--;
-
-    // 6. Replace each remaining run of consecutive required line break count items with a string consisting of as many U+000A LINE FEED (LF) characters as the maximum of the values in the required line break count items.
-    while (start <= end) {
-        const partialResult = results[start];
-
-        if (typeof partialResult === 'number') {
-            maxInSequence = partialResult;
-            // loop will end because all numbers were removed from the end of results.
-            while (typeof results[start + 1] === 'number') {
-                start++;
-                maxInSequence = Math.max(maxInSequence, results[start] as number);
-            }
-
-            elementInnerText += maxInSequence === 1 ? '\n' : '\n\n';
-        } else {
-            elementInnerText += partialResult;
-        }
-
-        start++;
-    }
-    // 7. Return the concatenation of the string items in results.
-
-    return elementInnerText;
 }
 
 function innerHTMLGetterPatched(this: Element): string {
@@ -342,55 +112,6 @@ function firstElementChildGetterPatched(this: ParentNode) {
 function lastElementChildGetterPatched(this: ParentNode) {
     const { children } = this;
     return children.item(children.length - 1) || null;
-}
-
-defineProperty(HTMLElement.prototype, 'innerText', {
-    get(this: Element): string {
-        if (!featureFlags.ENABLE_ELEMENT_PATCH) {
-            if (isNodeShadowed(this) || isHostElement(this)) {
-                return innerTextPatched.call(this);
-            }
-
-            return innerTextGetter.call(this);
-        }
-
-        // TODO [#1222]: remove global bypass
-        if (isGlobalPatchingSkipped(this)) {
-            return innerTextGetter.call(this);
-        }
-        return innerTextPatched.call(this);
-    },
-    set(v: string) {
-        innerTextSetter.call(this, v);
-    },
-    enumerable: true,
-    configurable: true,
-});
-
-// Note: Firefox does not have outerText, https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/outerText
-if (outerTextGetter !== null && outerTextSetter !== null) {
-    defineProperty(HTMLElement.prototype, 'outerText', {
-        get(this: Element): string {
-            if (!featureFlags.ENABLE_ELEMENT_PATCH) {
-                if (isNodeShadowed(this) || isHostElement(this)) {
-                    return innerTextPatched.call(this);
-                }
-
-                return outerTextGetter!.call(this);
-            }
-
-            // TODO [#1222]: remove global bypass
-            if (isGlobalPatchingSkipped(this)) {
-                return outerTextGetter!.call(this);
-            }
-            return innerTextPatched.call(this);
-        },
-        set(v: string) {
-            outerTextSetter!.call(this, v);
-        },
-        enumerable: true,
-        configurable: true,
-    });
 }
 
 // Non-deep-traversing patches: this descriptor map includes all descriptors that
