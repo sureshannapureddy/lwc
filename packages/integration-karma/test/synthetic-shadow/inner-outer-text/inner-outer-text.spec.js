@@ -1,4 +1,3 @@
-import { innerTextGetter, outerTextGetter } from 'browser-env';
 import { createElement } from 'lwc';
 import Container from 'x/container';
 
@@ -8,12 +7,62 @@ if (!process.env.NATIVE_SHADOW) {
         document.body.appendChild(elm);
 
         return Promise.resolve().then(() => {
-            const testCases = elm.shadowRoot.querySelectorAll('.test-case');
 
-            testCases.forEach((testCaseElement) => {
-                it(testCaseElement.getAttribute('data-desc'), () => {
-                    expect(testCaseElement.innerText).toBe(innerTextGetter.call(testCaseElement));
-                });
+            it('should remove consecutive LF in between from partial results', () => {
+                const testCase = elm.shadowRoot.querySelector('.consecutive-LF');
+
+                expect(testCase.innerText).toBe(`initial
+
+first case text
+
+second case text
+
+end`);
+            });
+
+            it('should remove hidden text + removes empty text between LF counts', () => {
+                const testCase = elm.shadowRoot.querySelector('.hidden-text-in-between');
+
+                expect(testCase.innerText).toBe(`initialend`);
+            });
+
+            it('should remove hidden text with css', () => {
+                const testCase = elm.shadowRoot.querySelector('.hidden-text-with-css');
+
+                expect(testCase.innerText).toBe(`initialend`);
+            });
+
+            it('should display textContent if element is hidden', () => {
+                const testCase = elm.shadowRoot.querySelector('.element-hidden-shows-text-content');
+
+                expect(testCase.innerText).toBe(`initialfirst case textsecond case textend`);
+            });
+
+            it('should return empty when childNodes are hidden', () => {
+                const testCase = elm.shadowRoot.querySelector('.empty-inner-text-due-hidden-children');
+
+                expect(testCase.innerText).toBe(``);
+            });
+
+            it('should collect text from multiple levels', () => {
+                const testCase = elm.shadowRoot.querySelector('.collect-text-multiple-levels');
+
+                expect(testCase.innerText).toBe(`This is, a text that should be displayed, in one line. It includes links.
+
+Also paragraphs
+
+and then another text`);
+            });
+
+            it('should collect text from tables (table-cell and table-row)', () => {
+                const testCase = elm.shadowRoot.querySelector('.table-testcase');
+
+                // Notice that:
+                // 1. the last \t on each row is incorrect, it's a relaxation from the spec.
+                // 2. the last \n is incorrect, it's also a relaxation from the spec.
+                expect(testCase.innerText).toBe(`1,1\t1,2\t
+2,1\t2,2\t
+`);
             });
 
             it('should not go inside custom element shadow', () => {
@@ -36,36 +85,33 @@ if (!process.env.NATIVE_SHADOW) {
         });
     });
 
-    describe('outerText', () => {
-        const elm = createElement('x-container', { is: Container });
-        document.body.appendChild(elm);
+    const outerTextDescriptor = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'outerText');
 
-        return Promise.resolve().then(() => {
-            const testCases = elm.shadowRoot.querySelectorAll('.test-case');
+    // Firefox does not have outerText.
+    if (outerTextDescriptor) {
+        describe('outerText', () => {
+            const elm = createElement('x-container', { is: Container });
+            document.body.appendChild(elm);
 
-            testCases.forEach((testCaseElement) => {
-                it(testCaseElement.getAttribute('data-desc'), () => {
-                    expect(testCaseElement.outerText).toBe(outerTextGetter.call(testCaseElement));
+            return Promise.resolve().then(() => {
+                it('should not go inside custom element shadow', () => {
+                    const testElement = elm.shadowRoot.querySelector('.without-slotted-content');
+
+                    expect(testElement.outerText).toBe('first text\nsecond text');
+                });
+
+                it('should process custom elements light dom', () => {
+                    const testElement = elm.shadowRoot.querySelector('.with-slotted-content');
+
+                    expect(testElement.outerText).toBe('first text\n\nslotted element\n\nsecond text');
+                });
+
+                it('should process custom elements light dom across multiple shadows', () => {
+                    const testElement = elm.shadowRoot.querySelector('.with-slotted-content-2-levels');
+
+                    expect(testElement.outerText).toBe('first text\n\nslotted element\n\nsecond text');
                 });
             });
-
-            it('should not go inside custom element shadow', () => {
-                const testElement = elm.shadowRoot.querySelector('.without-slotted-content');
-
-                expect(testElement.outerText).toBe('first text\nsecond text');
-            });
-
-            it('should process custom elements light dom', () => {
-                const testElement = elm.shadowRoot.querySelector('.with-slotted-content');
-
-                expect(testElement.outerText).toBe('first text\n\nslotted element\n\nsecond text');
-            });
-
-            it('should process custom elements light dom across multiple shadows', () => {
-                const testElement = elm.shadowRoot.querySelector('.with-slotted-content-2-levels');
-
-                expect(testElement.outerText).toBe('first text\n\nslotted element\n\nsecond text');
-            });
         });
-    });
+    }
 }
