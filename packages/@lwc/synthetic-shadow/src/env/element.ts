@@ -45,13 +45,15 @@ const lastElementChildGetter: (this: ParentNode) => Element | null = getOwnPrope
     'lastElementChild'
 )!.get!;
 
-// @todo: verify where is the innerText descriptor, i do believe is in HTMLElement
-const innerTextDescriptor = hasOwnProperty.call(Element.prototype, 'innerText')
-    ? getOwnPropertyDescriptor(Element.prototype, 'innerText')
-    : getOwnPropertyDescriptor(HTMLElement.prototype, 'innerText'); // IE11
+const innerTextDescriptor = getOwnPropertyDescriptor(HTMLElement.prototype, 'innerText');
 
 const innerTextGetter: (this: Element) => string = innerTextDescriptor!.get!;
 const innerTextSetter: (this: Element, s: string) => void = innerTextDescriptor!.set!;
+
+const outerTextDescriptor = getOwnPropertyDescriptor(HTMLElement.prototype, 'innerText');
+
+const outerTextGetter: (this: Element) => string = outerTextDescriptor!.get!;
+const outerTextSetter: (this: Element, s: string) => void = outerTextDescriptor!.set!;
 
 const innerHTMLDescriptor = hasOwnProperty.call(Element.prototype, 'innerHTML')
     ? getOwnPropertyDescriptor(Element.prototype, 'innerHTML')
@@ -121,6 +123,8 @@ export {
     matches,
     outerHTMLGetter,
     outerHTMLSetter,
+    outerTextGetter,
+    outerTextSetter,
     querySelector,
     querySelectorAll,
     removeAttribute,

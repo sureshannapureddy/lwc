@@ -7,12 +7,12 @@
 
 window.BrowserEnv = (function () {
     const innerTextDescriptor = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'innerText');
-
     const innerTextGetter = innerTextDescriptor.get;
-    const innerTextSetter = innerTextDescriptor.set;
+    const outerTextDescriptor = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'outerText');
+    const outerTextGetter = outerTextDescriptor.get;
 
     return {
         innerTextGetter,
-        innerTextSetter,
+        outerTextGetter,
     };
 })();

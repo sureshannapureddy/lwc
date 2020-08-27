@@ -32,10 +32,19 @@ import {
     childrenGetter,
     childElementCountGetter,
     firstElementChildGetter,
+    getElementsByClassName as elementGetElementsByClassName,
+    getElementsByTagName as elementGetElementsByTagName,
+    getElementsByTagNameNS as elementGetElementsByTagNameNS,
     innerHTMLGetter,
+    innerHTMLSetter,
+    innerTextGetter,
+    innerTextSetter,
     lastElementChildGetter,
     outerHTMLSetter,
     outerHTMLGetter,
+    outerTextGetter,
+    outerTextSetter,
+    querySelectorAll as elementQuerySelectorAll,
     shadowRootGetter as originalShadowRootGetter,
 } from '../env/element';
 import { windowGetComputedStyle, windowGetSelection } from '../env/window';
@@ -49,15 +58,6 @@ import {
     textContentGetterPatched,
     childNodesGetterPatched,
 } from './node';
-import {
-    innerHTMLSetter,
-    innerTextGetter,
-    innerTextSetter,
-    getElementsByClassName as elementGetElementsByClassName,
-    getElementsByTagName as elementGetElementsByTagName,
-    getElementsByTagNameNS as elementGetElementsByTagNameNS,
-    querySelectorAll as elementQuerySelectorAll,
-} from '../env/element';
 import { getOuterHTML } from '../3rdparty/polymer/outer-html';
 import { arrayFromCollection, getOwnerWindow, isGlobalPatchingSkipped } from '../shared/utils';
 import { getNodeOwnerKey, isNodeShadowed } from '../faux-shadow/node';
@@ -363,6 +363,28 @@ defineProperties(HTMLElement.prototype, {
         },
         set(v: string) {
             innerTextSetter.call(this, v);
+        },
+        enumerable: true,
+        configurable: true,
+    },
+    outerText: {
+        get(this: Element): string {
+            if (!featureFlags.ENABLE_ELEMENT_PATCH) {
+                if (isNodeShadowed(this) || isHostElement(this)) {
+                    return innerTextPatched.call(this);
+                }
+
+                return outerTextGetter.call(this);
+            }
+
+            // TODO [#1222]: remove global bypass
+            if (isGlobalPatchingSkipped(this)) {
+                return outerTextGetter.call(this);
+            }
+            return innerTextPatched.call(this);
+        },
+        set(v: string) {
+            outerTextSetter.call(this, v);
         },
         enumerable: true,
         configurable: true,
