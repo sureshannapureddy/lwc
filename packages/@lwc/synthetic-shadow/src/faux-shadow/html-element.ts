@@ -160,7 +160,7 @@ function getWindowSelection(node: Node): Selection | null {
 }
 
 function nodeIsBeingRendered(nodeComputedStyle: CSSStyleDeclaration): boolean {
-    return nodeComputedStyle.visibility !== 'hidden' && nodeComputedStyle.display !== 'none';
+    return nodeComputedStyle.visibility === 'visible' && nodeComputedStyle.display !== 'none';
 }
 
 type SelectionState = {
@@ -245,26 +245,28 @@ const nodeIsElement = (node: Node): node is Element => node.nodeType === ELEMENT
 function innerTextCollectionSteps(node: Node): InnerTextCollectionResult[] {
     const result: InnerTextCollectionResult[] = [];
 
-    node.childNodes.forEach((childNode) => {
-        ArrayPush.apply(result, innerTextCollectionSteps(childNode));
-    });
-
     if (nodeIsElement(node)) {
         const tagName = node.tagName;
         const computedStyle = getElementComputedStyle(node);
 
-        // 2. If node's computed value of 'visibility' is not 'visible', then return items.
-        if (computedStyle.visibility !== 'visible') {
-            return result;
+        if (tagName === 'OPTION') {
+            // For options, is hard to get the "rendered" text, let's use the original getter.
+            result.push(innerTextGetter.call(node));
+        } else {
+            node.childNodes.forEach((childNode) => {
+                ArrayPush.apply(result, innerTextCollectionSteps(childNode));
+            });
         }
 
-        // 3. If node is not being rendered, then return items. @todo: handle exceptions: select, optgroup, option
-        if (
-            !nodeIsBeingRendered(computedStyle) &&
-            tagName !== 'SELECT' &&
-            tagName !== 'OPTGROUP' &&
-            tagName !== 'OPTION'
-        ) {
+        // 2. If node's computed value of 'visibility' is not 'visible', then return items.
+        // 3. If node is not being rendered, then return items. Especial cases: select, datalist, optgroup, option
+        if (!nodeIsBeingRendered(computedStyle)) {
+            if (tagName === 'SELECT' || tagName === 'DATALIST') {
+                // the select is either: .visibility != 'visible' or .display === hidden, therefore this select should
+                // not display any value.
+                return [];
+            }
+
             return result;
         }
 
