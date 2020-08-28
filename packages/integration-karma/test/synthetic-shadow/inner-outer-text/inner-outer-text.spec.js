@@ -84,11 +84,14 @@ Cat`);
             expect(testCase.innerText).toBe(`Tell us your story:`);
         });
 
-        it('should not collect text from datalist', () => {
-            const testCase = elm.shadowRoot.querySelector('.datalist-case');
+        // datalist is supported on safari >= 12
+        if (!process.env.COMPAT) {
+            it('should not collect text from datalist', () => {
+                const testCase = elm.shadowRoot.querySelector('.datalist-case');
 
-            expect(testCase.innerText).toBe(`Choose a flavor:`);
-        });
+                expect(testCase.innerText).toBe(`Choose a flavor:`);
+            });
+        }
 
         it('should not go inside custom element shadow', () => {
             const testElement = elm.shadowRoot.querySelector('.without-slotted-content');
