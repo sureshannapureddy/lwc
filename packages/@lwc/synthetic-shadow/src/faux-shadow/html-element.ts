@@ -251,7 +251,9 @@ function innerTextCollectionSteps(node: Node): InnerTextCollectionResult[] {
 
         if (tagName === 'OPTION') {
             // For options, is hard to get the "rendered" text, let's use the original getter.
-            result.push(innerTextGetter.call(node));
+            return [1, innerTextGetter.call(node), 1];
+        } else if (tagName === 'TEXTAREA') {
+            return [];
         } else {
             node.childNodes.forEach((childNode) => {
                 ArrayPush.apply(result, innerTextCollectionSteps(childNode));
