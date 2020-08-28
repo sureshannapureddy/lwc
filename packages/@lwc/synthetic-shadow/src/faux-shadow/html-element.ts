@@ -14,7 +14,7 @@ import {
     tabIndexGetter,
     tabIndexSetter,
 } from '../env/element';
-import { isNull, isFalse, defineProperties, ArrayPush, defineProperty } from '@lwc/shared';
+import { isNull, isFalse, defineProperties, ArrayPush, defineProperty, forEach } from '@lwc/shared';
 import {
     disableKeyboardFocusNavigationRoutines,
     enableKeyboardFocusNavigationRoutines,
@@ -26,7 +26,7 @@ import {
     ignoreFocusIn,
 } from './focus';
 import featureFlags from '@lwc/features';
-import { childNodesGetterPatched, isNodeShadowed, textContentGetterPatched } from './node';
+import { isNodeShadowed } from './node';
 import { getOwnerWindow, isGlobalPatchingSkipped } from '../shared/utils';
 import { windowGetComputedStyle, windowGetSelection } from '../env/window';
 import { ELEMENT_NODE, TEXT_NODE } from '../env/node';
@@ -231,13 +231,20 @@ function getTextNodeInnerText(textNode: Node): string {
         return textNode.textContent || '';
     }
 
-    selection.removeAllRanges();
     const range = document.createRange();
     range.selectNodeContents(textNode);
-    selection.addRange(range);
-    const text = selection.toString();
+    const domRect = range.getBoundingClientRect();
 
-    return text;
+    if (domRect.height <= 0 || domRect.width <= 0) {
+        // the text node is not rendered
+        return '';
+    }
+
+    // Needed to remove non rendered characters from the text node.
+    selection.removeAllRanges();
+    selection.addRange(range);
+
+    return selection.toString();
 }
 
 const nodeIsElement = (node: Node): node is Element => node.nodeType === ELEMENT_NODE;
@@ -255,9 +262,12 @@ function innerTextCollectionSteps(node: Node): InnerTextCollectionResult[] {
         } else if (tagName === 'TEXTAREA') {
             return [];
         } else {
-            node.childNodes.forEach((childNode) => {
+            forEach.call(node.childNodes, (childNode) => {
                 ArrayPush.apply(result, innerTextCollectionSteps(childNode));
             });
+            // node.childNodes.forEach((childNode) => {
+            //     ArrayPush.apply(result, innerTextCollectionSteps(childNode));
+            // });
         }
 
         // 2. If node's computed value of 'visibility' is not 'visible', then return items.
@@ -314,7 +324,7 @@ function innerTextPatched(this: Element): string {
     const thisComputedStyle = getElementComputedStyle(this);
     // 1. If this is not being rendered or if the user agent is a non-CSS user agent, then return this's descendant text content.
     if (!nodeIsBeingRendered(thisComputedStyle)) {
-        return textContentGetterPatched.call(this);
+        return this.textContent || ''; // textContentGetterPatched.call(this);
     }
 
     const selectionState = getSelectionState(this);
@@ -322,8 +332,8 @@ function innerTextPatched(this: Element): string {
     // 2. Let results be a new empty list.
     let results: InnerTextCollectionResult[] = [];
     // 3. For each child node node of this:
-    const childNodes = childNodesGetterPatched.call(this);
-    childNodes.forEach((childNode) => {
+    const childNodes = this.childNodes;
+    forEach.call(childNodes, (childNode) => {
         //   3.1 Let current be the list resulting in running the inner text collection steps with node. Each item in results will either be a string or a positive integer (a required line break count).
         //   3.2 For each item item in current, append item to results.
         ArrayPush.apply(results, innerTextCollectionSteps(childNode));
