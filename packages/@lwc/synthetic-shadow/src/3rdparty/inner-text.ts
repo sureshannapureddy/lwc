@@ -4,10 +4,10 @@
  * SPDX-License-Identifier: MIT
  * For full license text, see the LICENSE file in the repo root or https://opensource.org/licenses/MIT
  */
-import { getOwnerWindow } from "../shared/utils";
-import { windowGetComputedStyle, windowGetSelection } from "../env/window";
-import { ELEMENT_NODE, TEXT_NODE } from "../env/node";
-import { innerTextGetter } from "../env/element";
+import { getOwnerWindow } from '../shared/utils';
+import { windowGetComputedStyle, windowGetSelection } from '../env/window';
+import { ELEMENT_NODE, TEXT_NODE } from '../env/node';
+import { innerTextGetter } from '../env/element';
 
 const { push: ArrayPush } = Array.prototype;
 
