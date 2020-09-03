@@ -25,16 +25,7 @@ import { logError } from '../shared/logger';
 import { invokeEventListener } from './invoker';
 import { getVMBeingRendered } from './template';
 import { EmptyArray, EmptyObject } from './utils';
-import {
-    runConnectedCallback,
-    SlotSet,
-    VM,
-    VMState,
-    getAssociatedVMIfPresent,
-    removeVM,
-    rerenderVM,
-    appendVM,
-} from './vm';
+import { getAssociatedVM, runConnectedCallback, SlotSet, VM, VMState } from './vm';
 import { ComponentConstructor } from './component';
 import {
     VNode,
@@ -48,7 +39,9 @@ import {
 } from '../3rdparty/snabbdom/types';
 import {
     createViewModelHook,
+    insertCustomElmHook,
     fallbackElmHook,
+    rerenderCustomElmHook,
     removeElmHook,
     createChildrenHook,
     updateNodeHook,
@@ -60,10 +53,10 @@ import {
     updateCustomElmHook,
     updateChildrenHook,
     allocateChildrenHook,
+    removeCustomElmHook,
     markAsDynamicChildren,
 } from './hooks';
 import { isComponentConstructor } from './def';
-import { getUpgradableConstructor, UpgradableCustomElementConstructor } from './upgradable-element';
 
 export interface ElementCompilerData extends VNodeData {
     key: Key;
@@ -146,85 +139,48 @@ const ElementHook: Hooks<VElement> = {
     },
 };
 
-function isUpgradableComponent(
-    ctor: CustomElementConstructor | UpgradableCustomElementConstructor
-): ctor is UpgradableCustomElementConstructor {
-    return 'upgrade' in ctor;
-}
-
 const CustomElementHook: Hooks<VCustomElement> = {
     create: (vnode) => {
         const {
             sel,
             owner: { renderer },
         } = vnode;
-        const UpgradableConstructor = getUpgradableConstructor(sel, renderer);
-        if (isUpgradableComponent(UpgradableConstructor)) {
-            // the custom element from the registry is expecting an upgrade callback
-            UpgradableConstructor.upgrade = (elm: HTMLElement) => {
-                createViewModelHook(elm, vnode);
-            };
-        }
-        const elm = new UpgradableConstructor();
-        vnode.elm = elm;
-        linkNodeToShadow(elm, vnode);
+        const elm = renderer.createElement(sel);
 
-        const vm = getAssociatedVMIfPresent(elm);
-        if (vm) {
-            allocateChildrenHook(vnode, vm);
-        } else if (vnode.ctor !== UpgradableConstructor) {
-            throw new TypeError(`Incorrect Component Constructor`);
-        }
+        linkNodeToShadow(elm, vnode);
+        createViewModelHook(elm, vnode);
+        vnode.elm = elm;
+
+        allocateChildrenHook(vnode);
         createCustomElmHook(vnode);
     },
     update: (oldVnode, vnode) => {
         updateCustomElmHook(oldVnode, vnode);
-        const vm = getAssociatedVMIfPresent(vnode.elm);
-        if (vm) {
-            // in fallback mode, the allocation will always set children to
-            // empty and delegate the real allocation to the slot elements
-            allocateChildrenHook(vnode, vm);
-        }
+        // in fallback mode, the allocation will always set children to
+        // empty and delegate the real allocation to the slot elements
+        allocateChildrenHook(vnode);
         // in fallback mode, the children will be always empty, so, nothing
         // will happen, but in native, it does allocate the light dom
         updateChildrenHook(oldVnode, vnode);
-        if (vm) {
-            if (process.env.NODE_ENV !== 'production') {
-                assert.isTrue(
-                    isArray(vnode.children),
-                    `Invalid vnode for a custom element, it must have children defined.`
-                );
-            }
-            // this will probably update the shadowRoot, but only if the vm is in a dirty state
-            // this is important to preserve the top to bottom synchronous rendering phase.
-            rerenderVM(vm);
-        }
+        // this will update the shadowRoot
+        rerenderCustomElmHook(vnode);
     },
     insert: (vnode, parentNode, referenceNode) => {
         insertNodeHook(vnode, parentNode, referenceNode);
-        const vm = getAssociatedVMIfPresent(vnode.elm);
-        if (vm) {
-            if (process.env.NODE_ENV !== 'production') {
-                assert.isTrue(vm.state === VMState.created, `${vm} cannot be recycled.`);
-            }
-            runConnectedCallback(vm);
+        const vm = getAssociatedVM(vnode.elm!);
+        if (process.env.NODE_ENV !== 'production') {
+            assert.isTrue(vm.state === VMState.created, `${vm} cannot be recycled.`);
         }
+        runConnectedCallback(vm);
         createChildrenHook(vnode);
-        if (vm) {
-            appendVM(vm);
-        }
+        insertCustomElmHook(vnode);
     },
     move: (vnode, parentNode, referenceNode) => {
         insertNodeHook(vnode, parentNode, referenceNode);
     },
     remove: (vnode, parentNode) => {
         removeNodeHook(vnode, parentNode);
-        const vm = getAssociatedVMIfPresent(vnode.elm);
-        if (vm) {
-            // for custom elements we don't have to go recursively because the removeVM routine
-            // will take care of disconnecting any child VM attached to its shadow as well.
-            removeVM(vm);
-        }
+        removeCustomElmHook(vnode);
     },
 };
 
