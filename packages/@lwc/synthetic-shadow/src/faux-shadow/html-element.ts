@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * For full license text, see the LICENSE file in the repo root or https://opensource.org/licenses/MIT
  */
+import featureFlags from '@lwc/features';
+import { isNull, isFalse, defineProperties, defineProperty } from '@lwc/shared';
 import { isDelegatingFocus, isHostElement } from './shadow-root';
 import {
     hasAttribute,
@@ -14,7 +16,6 @@ import {
     tabIndexGetter,
     tabIndexSetter,
 } from '../env/element';
-import { isNull, isFalse, defineProperties, defineProperty } from '@lwc/shared';
 import {
     disableKeyboardFocusNavigationRoutines,
     enableKeyboardFocusNavigationRoutines,
@@ -25,7 +26,6 @@ import {
     ignoreFocus,
     ignoreFocusIn,
 } from './focus';
-import featureFlags from '@lwc/features';
 import { isNodeShadowed } from './node';
 import { isGlobalPatchingSkipped } from '../shared/utils';
 import { getInnerText } from '../3rdparty/inner-text';
@@ -172,10 +172,10 @@ defineProperties(HTMLElement.prototype, {
         configurable: true,
     },
     innerText: {
-        get(this: Element): string {
+        get(this: HTMLElement): string {
             if (!featureFlags.ENABLE_ELEMENT_PATCH) {
                 if (isNodeShadowed(this) || isHostElement(this)) {
-                    return getInnerText.call(this);
+                    return getInnerText(this);
                 }
 
                 return innerTextGetter.call(this);
@@ -185,9 +185,9 @@ defineProperties(HTMLElement.prototype, {
             if (isGlobalPatchingSkipped(this)) {
                 return innerTextGetter.call(this);
             }
-            return getInnerText.call(this);
+            return getInnerText(this);
         },
-        set(v: string) {
+        set(this: HTMLElement, v: string) {
             innerTextSetter.call(this, v);
         },
         enumerable: true,
@@ -207,11 +207,14 @@ defineProperties(HTMLElement.prototype, {
 
 // Note: Firefox does not have outerText, https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/outerText
 if (outerTextGetter !== null && outerTextSetter !== null) {
+    // From https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/outerText :
+    // HTMLElement.outerText is a non-standard property. As a getter, it returns the same value as Node.innerText.
+    // As a setter, it removes the current node and replaces it with the given text.
     defineProperty(HTMLElement.prototype, 'outerText', {
-        get(this: Element): string {
+        get(this: HTMLElement): string {
             if (!featureFlags.ENABLE_ELEMENT_PATCH) {
                 if (isNodeShadowed(this) || isHostElement(this)) {
-                    return getInnerText.call(this);
+                    return getInnerText(this);
                 }
 
                 return outerTextGetter!.call(this);
@@ -221,9 +224,9 @@ if (outerTextGetter !== null && outerTextSetter !== null) {
             if (isGlobalPatchingSkipped(this)) {
                 return outerTextGetter!.call(this);
             }
-            return getInnerText.call(this);
+            return getInnerText(this);
         },
-        set(v: string) {
+        set(this: HTMLElement, v: string) {
             outerTextSetter!.call(this, v);
         },
         enumerable: true,

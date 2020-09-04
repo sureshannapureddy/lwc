@@ -11,7 +11,15 @@ import { innerTextGetter } from '../env/element';
 
 const { push: ArrayPush } = Array.prototype;
 
-type InnerTextCollectionResult = string | number;
+type InnerTextItem = string | number;
+
+interface SelectionState {
+    element: Element;
+    onselect: ((this: GlobalEventHandlers, ev: Event) => any) | null;
+    onselectionchange: ((this: GlobalEventHandlers, ev: Event) => any) | null;
+    onselectstart: ((this: GlobalEventHandlers, ev: Event) => any) | null;
+    ranges: Range[];
+}
 
 function getElementComputedStyle(element: Element): CSSStyleDeclaration {
     const win = getOwnerWindow(element);
@@ -29,13 +37,6 @@ function nodeIsBeingRendered(nodeComputedStyle: CSSStyleDeclaration): boolean {
     return nodeComputedStyle.visibility === 'visible' && nodeComputedStyle.display !== 'none';
 }
 
-type SelectionState = {
-    element: Element;
-    onselect: ((this: GlobalEventHandlers, ev: Event) => any) | null;
-    onselectionchange: ((this: GlobalEventHandlers, ev: Event) => any) | null;
-    onselectstart: ((this: GlobalEventHandlers, ev: Event) => any) | null;
-    ranges: Range[];
-};
 function getSelectionState(element: Element): SelectionState | null {
     const win = getOwnerWindow(element);
     const selection = getWindowSelection(element);
@@ -64,7 +65,7 @@ function getSelectionState(element: Element): SelectionState | null {
     return state;
 }
 
-function restoreSelectionState(state: SelectionState | null) {
+function restoreSelectionState(state: SelectionState | null): void {
     if (state === null) {
         return;
     }
@@ -91,7 +92,7 @@ function restoreSelectionState(state: SelectionState | null) {
  *       an element, it does not restore the current selection.
  * @param textNode
  */
-function getTextNodeInnerText(textNode: Node): string {
+function getTextNodeInnerText(textNode: Text): string {
     const selection = getWindowSelection(textNode);
 
     if (selection === null) {
@@ -115,12 +116,17 @@ function getTextNodeInnerText(textNode: Node): string {
 }
 
 const nodeIsElement = (node: Node): node is Element => node.nodeType === ELEMENT_NODE;
+const nodeIsText = (node: Node): node is Text => node.nodeType === TEXT_NODE;
 
-function innerTextCollectionSteps(node: Node): InnerTextCollectionResult[] {
-    const result: InnerTextCollectionResult[] = [];
+/**
+ * Spec: https://html.spec.whatwg.org/multipage/dom.html#inner-text-collection-steps
+ * @param node
+ */
+function innerTextCollectionSteps(node: Node): InnerTextItem[] {
+    const items: InnerTextItem[] = [];
 
     if (nodeIsElement(node)) {
-        const tagName = node.tagName;
+        const { tagName } = node;
         const computedStyle = getElementComputedStyle(node);
 
         if (tagName === 'OPTION') {
@@ -131,12 +137,10 @@ function innerTextCollectionSteps(node: Node): InnerTextCollectionResult[] {
         } else {
             const childNodes = node.childNodes;
             for (let i = 0, n = childNodes.length; i < n; i++) {
-                ArrayPush.apply(result, innerTextCollectionSteps(childNodes[i]));
+                ArrayPush.apply(items, innerTextCollectionSteps(childNodes[i]));
             }
         }
 
-        // 2. If node's computed value of 'visibility' is not 'visible', then return items.
-        // 3. If node is not being rendered, then return items. Especial cases: select, datalist, optgroup, option
         if (!nodeIsBeingRendered(computedStyle)) {
             if (tagName === 'SELECT' || tagName === 'DATALIST') {
                 // the select is either: .visibility != 'visible' or .display === hidden, therefore this select should
@@ -144,60 +148,55 @@ function innerTextCollectionSteps(node: Node): InnerTextCollectionResult[] {
                 return [];
             }
 
-            return result;
+            return items;
         }
 
-        // 5. If node is a br element, then append a string containing a single U+000A LINE FEED (LF) character to items.
         if (tagName === 'BR') {
-            result.push('\n');
+            items.push('\n');
         }
 
-        // 6. If node's computed value of 'display' is 'table-cell', and node's CSS box is not the last 'table-cell' box of its enclosing 'table-row' box, then append a string containing a single U+0009 CHARACTER TABULATION (tab) character to items.
-        if (computedStyle.display === 'table-cell') {
+       if (computedStyle.display === 'table-cell') {
             // omitting case: and node's CSS box is not the last 'table-cell' box of its enclosing 'table-row' box
-            result.push('\t');
+            items.push('\t');
         }
 
-        // 7. If node's computed value of 'display' is 'table-row', and node's CSS box is not the last 'table-row' box of the nearest ancestor 'table' box, then append a string containing a single U+000A LINE FEED (LF) character to items.
         if (computedStyle.display === 'table-row') {
             // omitting case: and node's CSS box is not the last 'table-row' box of the nearest ancestor 'table' box
-            result.push('\n');
+            items.push('\n');
         }
 
-        // 8. If node is a p element, then append 2 (a required line break count) at the beginning and end of items.
         if (tagName === 'P') {
-            result.unshift(2);
-            result.push(2);
+            items.unshift(2);
+            items.push(2);
         }
 
-        // 9. If node's used value of 'display' is block-level or 'table-caption', then append 1 (a required line break count) at the beginning and end of items.
         if (computedStyle.display === 'block' || computedStyle.display === 'table-caption') {
-            result.unshift(1);
-            result.push(1);
+            items.unshift(1);
+            items.push(1);
         }
-    } else if (node.nodeType === TEXT_NODE) {
-        result.push(getTextNodeInnerText(node));
+    } else if (nodeIsText(node)) {
+        items.push(getTextNodeInnerText(node));
     }
 
-    return result;
+    return items;
 }
 
 /**
  * innerText spec: https://html.spec.whatwg.org/multipage/dom.html#the-innertext-idl-attribute
  */
-export function getInnerText(this: Element): string {
-    const thisComputedStyle = getElementComputedStyle(this);
+export function getInnerText(element: Element): string {
+    const thisComputedStyle = getElementComputedStyle(element);
     // 1. If this is not being rendered or if the user agent is a non-CSS user agent, then return this's descendant text content.
     if (!nodeIsBeingRendered(thisComputedStyle)) {
-        return this.textContent || ''; // textContentGetterPatched.call(this);
+        return element.textContent || ''; // textContentGetterPatched.call(this);
     }
 
-    const selectionState = getSelectionState(this);
+    const selectionState = getSelectionState(element);
 
     // 2. Let results be a new empty list.
-    let results: InnerTextCollectionResult[] = [];
+    let results: InnerTextItem[] = [];
     // 3. For each child node node of this:
-    const childNodes = this.childNodes;
+    const childNodes = element.childNodes;
     for (let i = 0, n = childNodes.length; i < n; i++) {
         //   3.1 Let current be the list resulting in running the inner text collection steps with node. Each item in results will either be a string or a positive integer (a required line break count).
         //   3.2 For each item item in current, append item to results.

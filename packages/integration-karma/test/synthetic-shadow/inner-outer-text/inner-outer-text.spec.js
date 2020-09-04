@@ -120,30 +120,28 @@ Cat`);
             const elm = createElement('x-container', { is: Container });
             document.body.appendChild(elm);
 
-            return Promise.resolve().then(() => {
-                it('should not go inside custom element shadow', () => {
-                    const testElement = elm.shadowRoot.querySelector('.without-slotted-content');
+            it('should not go inside custom element shadow', () => {
+                const testElement = elm.shadowRoot.querySelector('.without-slotted-content');
 
-                    expect(testElement.outerText).toBe('first text\nsecond text');
-                });
+                expect(testElement.outerText).toBe('first text\nsecond text');
+            });
 
-                it('should process custom elements light dom', () => {
-                    const testElement = elm.shadowRoot.querySelector('.with-slotted-content');
+            it('should process custom elements light dom', () => {
+                const testElement = elm.shadowRoot.querySelector('.with-slotted-content');
 
-                    expect(testElement.outerText).toBe(
-                        'first text\n\nslotted element\n\nsecond text'
-                    );
-                });
+                expect(testElement.outerText).toBe(
+                    'first text\n\nslotted element\n\nsecond text'
+                );
+            });
 
-                it('should process custom elements light dom across multiple shadows', () => {
-                    const testElement = elm.shadowRoot.querySelector(
-                        '.with-slotted-content-2-levels'
-                    );
+            it('should process custom elements light dom across multiple shadows', () => {
+                const testElement = elm.shadowRoot.querySelector(
+                    '.with-slotted-content-2-levels'
+                );
 
-                    expect(testElement.outerText).toBe(
-                        'first text\n\nslotted element\n\nsecond text'
-                    );
-                });
+                expect(testElement.outerText).toBe(
+                    'first text\n\nslotted element\n\nsecond text'
+                );
             });
         });
     }
