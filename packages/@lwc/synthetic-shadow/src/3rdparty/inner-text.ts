@@ -4,12 +4,13 @@
  * SPDX-License-Identifier: MIT
  * For full license text, see the LICENSE file in the repo root or https://opensource.org/licenses/MIT
  */
-import { getOwnerWindow } from '../shared/utils';
-import { windowGetComputedStyle, windowGetSelection } from '../env/window';
-import { ELEMENT_NODE, TEXT_NODE } from '../env/node';
+import { ArrayPush } from "@lwc/shared";
 import { innerTextGetter } from '../env/element';
-
-const { push: ArrayPush } = Array.prototype;
+import { ELEMENT_NODE, TEXT_NODE } from '../env/node';
+import { windowGetComputedStyle, windowGetSelection } from '../env/window';
+import { childNodesGetterPatched } from '../faux-shadow/node';
+import { getOwnerWindow } from '../shared/utils';
+import { getTextContent } from "./polymer/text-content";
 
 type InnerTextItem = string | number;
 
@@ -135,7 +136,7 @@ function innerTextCollectionSteps(node: Node): InnerTextItem[] {
         } else if (tagName === 'TEXTAREA') {
             return [];
         } else {
-            const childNodes = node.childNodes;
+            const childNodes = childNodesGetterPatched.call(node);
             for (let i = 0, n = childNodes.length; i < n; i++) {
                 ArrayPush.apply(items, innerTextCollectionSteps(childNodes[i]));
             }
@@ -188,7 +189,7 @@ export function getInnerText(element: Element): string {
     const thisComputedStyle = getElementComputedStyle(element);
     // 1. If this is not being rendered or if the user agent is a non-CSS user agent, then return this's descendant text content.
     if (!nodeIsBeingRendered(thisComputedStyle)) {
-        return element.textContent || ''; // textContentGetterPatched.call(this);
+        return getTextContent(element) || '';
     }
 
     const selectionState = getSelectionState(element);
@@ -196,7 +197,7 @@ export function getInnerText(element: Element): string {
     // 2. Let results be a new empty list.
     let results: InnerTextItem[] = [];
     // 3. For each child node node of this:
-    const childNodes = element.childNodes;
+    const childNodes = childNodesGetterPatched.call(element);
     for (let i = 0, n = childNodes.length; i < n; i++) {
         //   3.1 Let current be the list resulting in running the inner text collection steps with node. Each item in results will either be a string or a positive integer (a required line break count).
         //   3.2 For each item item in current, append item to results.
