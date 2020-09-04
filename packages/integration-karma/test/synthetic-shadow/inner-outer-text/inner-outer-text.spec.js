@@ -129,19 +129,13 @@ Cat`);
             it('should process custom elements light dom', () => {
                 const testElement = elm.shadowRoot.querySelector('.with-slotted-content');
 
-                expect(testElement.outerText).toBe(
-                    'first text\n\nslotted element\n\nsecond text'
-                );
+                expect(testElement.outerText).toBe('first text\n\nslotted element\n\nsecond text');
             });
 
             it('should process custom elements light dom across multiple shadows', () => {
-                const testElement = elm.shadowRoot.querySelector(
-                    '.with-slotted-content-2-levels'
-                );
+                const testElement = elm.shadowRoot.querySelector('.with-slotted-content-2-levels');
 
-                expect(testElement.outerText).toBe(
-                    'first text\n\nslotted element\n\nsecond text'
-                );
+                expect(testElement.outerText).toBe('first text\n\nslotted element\n\nsecond text');
             });
         });
     }

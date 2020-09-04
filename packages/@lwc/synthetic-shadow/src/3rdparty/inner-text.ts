@@ -4,13 +4,13 @@
  * SPDX-License-Identifier: MIT
  * For full license text, see the LICENSE file in the repo root or https://opensource.org/licenses/MIT
  */
-import { ArrayPush } from "@lwc/shared";
+import { ArrayPush } from '@lwc/shared';
 import { innerTextGetter } from '../env/element';
 import { ELEMENT_NODE, TEXT_NODE } from '../env/node';
 import { windowGetComputedStyle, windowGetSelection } from '../env/window';
 import { childNodesGetterPatched } from '../faux-shadow/node';
 import { getOwnerWindow } from '../shared/utils';
-import { getTextContent } from "./polymer/text-content";
+import { getTextContent } from './polymer/text-content';
 
 type InnerTextItem = string | number;
 
@@ -121,6 +121,7 @@ const nodeIsText = (node: Node): node is Text => node.nodeType === TEXT_NODE;
 
 /**
  * Spec: https://html.spec.whatwg.org/multipage/dom.html#inner-text-collection-steps
+ * One spec implementation: https://github.com/servo/servo/blob/721271dcd3c20db5ca8cf146e2b5907647afb4d6/components/layout/query.rs#L1132
  * @param node
  */
 function innerTextCollectionSteps(node: Node): InnerTextItem[] {
@@ -153,17 +154,19 @@ function innerTextCollectionSteps(node: Node): InnerTextItem[] {
         }
 
         if (tagName === 'BR') {
-            items.push('\n');
+            items.push('\u{000A}' /* line feed */);
         }
 
-       if (computedStyle.display === 'table-cell') {
+        const { display } = computedStyle;
+
+        if (display === 'table-cell') {
             // omitting case: and node's CSS box is not the last 'table-cell' box of its enclosing 'table-row' box
-            items.push('\t');
+            items.push('\u{0009}' /* tab */);
         }
 
-        if (computedStyle.display === 'table-row') {
+        if (display === 'table-row') {
             // omitting case: and node's CSS box is not the last 'table-row' box of the nearest ancestor 'table' box
-            items.push('\n');
+            items.push('\u{000A}' /* line feed */);
         }
 
         if (tagName === 'P') {
@@ -171,7 +174,12 @@ function innerTextCollectionSteps(node: Node): InnerTextItem[] {
             items.push(2);
         }
 
-        if (computedStyle.display === 'block' || computedStyle.display === 'table-caption') {
+        if (
+            display === 'block' ||
+            display === 'table-caption' ||
+            display === 'flex' ||
+            display === 'table'
+        ) {
             items.unshift(1);
             items.push(1);
         }
@@ -183,61 +191,57 @@ function innerTextCollectionSteps(node: Node): InnerTextItem[] {
 }
 
 /**
- * innerText spec: https://html.spec.whatwg.org/multipage/dom.html#the-innertext-idl-attribute
+ * InnerText getter spec: https://html.spec.whatwg.org/multipage/dom.html#the-innertext-idl-attribute
+ *
+ * One spec implementation: https://github.com/servo/servo/blob/721271dcd3c20db5ca8cf146e2b5907647afb4d6/components/layout/query.rs#L1087
  */
 export function getInnerText(element: Element): string {
     const thisComputedStyle = getElementComputedStyle(element);
-    // 1. If this is not being rendered or if the user agent is a non-CSS user agent, then return this's descendant text content.
+
     if (!nodeIsBeingRendered(thisComputedStyle)) {
         return getTextContent(element) || '';
     }
 
     const selectionState = getSelectionState(element);
-
-    // 2. Let results be a new empty list.
-    let results: InnerTextItem[] = [];
-    // 3. For each child node node of this:
+    const results: InnerTextItem[] = [];
     const childNodes = childNodesGetterPatched.call(element);
+
     for (let i = 0, n = childNodes.length; i < n; i++) {
-        //   3.1 Let current be the list resulting in running the inner text collection steps with node. Each item in results will either be a string or a positive integer (a required line break count).
-        //   3.2 For each item item in current, append item to results.
         ArrayPush.apply(results, innerTextCollectionSteps(childNodes[i]));
     }
 
     restoreSelectionState(selectionState);
 
-    // 4. Remove any items from results that are the empty string.
-    results = results.filter((result) => typeof result === 'number' || result.length > 0);
-
-    // 5. Remove any runs of consecutive required line break count items at the start or end of results.
-    let start = 0;
-    let end = results.length - 1;
-    let maxInSequence;
     let elementInnerText = '';
+    let maxReqLineBreakCount = 0;
+    for (let i = 0, n = results.length; i < n; i++) {
+        const item = results[i];
 
-    while (typeof results[start] === 'number' && start <= end) start++;
-    while (typeof results[end] === 'number' && end > start) end--;
+        if (typeof item === 'string') {
+            if (maxReqLineBreakCount > 0) {
+                for (let j = 0; j < maxReqLineBreakCount; j++) {
+                    elementInnerText += '\u{000A}';
+                }
 
-    // 6. Replace each remaining run of consecutive required line break count items with a string consisting of as many U+000A LINE FEED (LF) characters as the maximum of the values in the required line break count items.
-    while (start <= end) {
-        const partialResult = results[start];
-
-        if (typeof partialResult === 'number') {
-            maxInSequence = partialResult;
-            // loop will end because all numbers were removed from the end of results.
-            while (typeof results[start + 1] === 'number') {
-                start++;
-                maxInSequence = Math.max(maxInSequence, results[start] as number);
+                maxReqLineBreakCount = 0;
             }
 
-            elementInnerText += maxInSequence === 1 ? '\n' : '\n\n';
+            if (item.length > 0) {
+                elementInnerText += item;
+            }
         } else {
-            elementInnerText += partialResult;
+            if (elementInnerText.length == 0) {
+                // Remove required line break count at the start.
+                continue;
+            }
+            // Store the count if it's the max of this run,
+            // but it may be ignored if no text item is found afterwards,
+            // which means that these are consecutive line breaks at the end.
+            if (item > maxReqLineBreakCount) {
+                maxReqLineBreakCount = item;
+            }
         }
-
-        start++;
     }
-    // 7. Return the concatenation of the string items in results.
 
     return elementInnerText;
 }
