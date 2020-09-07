@@ -4,9 +4,6 @@
  * SPDX-License-Identifier: MIT
  * For full license text, see the LICENSE file in the repo root or https://opensource.org/licenses/MIT
  */
-
-/* eslint-env node */
-
 const path = require('path');
 const typescript = require('typescript');
 const typescriptPlugin = require('rollup-plugin-typescript');
@@ -27,7 +24,7 @@ module.exports = {
             file: path.resolve(
                 __dirname,
                 '../dist',
-                `engine-dom${format === 'cjs' ? '.cjs' : ''}.js`
+                `wire-service${format === 'cjs' ? '.cjs' : ''}.js`
             ),
             format,
             banner: banner,

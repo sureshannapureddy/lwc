@@ -36,7 +36,7 @@ const formats = ['es', 'cjs'];
 module.exports = {
     input: path.resolve(__dirname, '../src/index.ts'),
 
-    external: Object.keys(packageJson.dependencies),
+    external: Object.keys(packageJson.dependencies || {}),
 
     output: formats.map((format) => {
         return {
