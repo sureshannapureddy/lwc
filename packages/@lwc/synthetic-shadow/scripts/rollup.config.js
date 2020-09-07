@@ -11,4 +11,5 @@ const rollupConfig = require('../../../../scripts/rollup/rollup.config');
 module.exports = rollupConfig({
     root: path.resolve(__dirname, '..'),
     name: 'synthetic-shadow',
+    featureFlags: true,
 });
