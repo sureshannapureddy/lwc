@@ -23,7 +23,7 @@
         "dist/",
         "types/"
     ],
-    "devDependencies": {
+    "dependencies": {
         "@lwc/engine-dom": "1.7.14"
     },
     "lwc": {

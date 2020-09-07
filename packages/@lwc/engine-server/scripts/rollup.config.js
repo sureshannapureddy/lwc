@@ -7,18 +7,18 @@
 
 const path = require('path');
 const typescript = require('typescript');
-
-const nodeResolvePlugin = require('rollup-plugin-node-resolve');
 const typescriptPlugin = require('rollup-plugin-typescript');
 
-const { version } = require('../package.json');
+const packageJson = require('../package.json');
 
 const banner = `/* proxy-compat-disable */`;
-const footer = `/* version: ${version} */`;
+const footer = `/* version: ${packageJson.version} */`;
 const formats = ['es', 'cjs'];
 
 module.exports = {
     input: path.resolve(__dirname, '../src/index.ts'),
+
+    external: Object.keys(packageJson.dependencies),
 
     output: formats.map((format) => {
         return {
@@ -34,7 +34,6 @@ module.exports = {
     }),
 
     plugins: [
-        nodeResolvePlugin({ only: [/^@lwc\//] }),
         typescriptPlugin({
             target: 'es2017',
             typescript,

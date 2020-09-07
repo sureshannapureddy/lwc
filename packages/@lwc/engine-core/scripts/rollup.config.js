@@ -8,13 +8,13 @@
 /* eslint-env node */
 
 const path = require('path');
-const typescript = require('typescript');
-
-const nodeResolvePlugin = require('rollup-plugin-node-resolve');
-const typescriptPlugin = require('rollup-plugin-typescript');
-
 const babel = require('@babel/core');
+const typescript = require('typescript');
+const typescriptPlugin = require('rollup-plugin-typescript');
+const nodeResolvePlugin = require('rollup-plugin-node-resolve');
 const babelFeaturesPlugin = require('@lwc/features/src/babel-plugin');
+
+const packageJson = require('../package.json');
 
 function rollupFeaturesPlugin() {
     return {
@@ -36,6 +36,8 @@ const formats = ['es', 'cjs'];
 module.exports = {
     input: path.resolve(__dirname, '../src/index.ts'),
 
+    external: Object.keys(packageJson.dependencies),
+
     output: formats.map((format) => {
         return {
             file: path.resolve(
@@ -50,7 +52,7 @@ module.exports = {
     }),
 
     plugins: [
-        nodeResolvePlugin({ only: [/^@lwc\//, 'observable-membrane'] }),
+        nodeResolvePlugin(),
         typescriptPlugin({
             target: 'es2017',
             typescript,

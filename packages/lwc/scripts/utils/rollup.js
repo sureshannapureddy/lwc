@@ -9,6 +9,7 @@ const { rollup } = require('rollup');
 const typescript = require('typescript');
 const rollupTypescriptPlugin = require('rollup-plugin-typescript');
 const rollupReplace = require('@rollup/plugin-replace');
+const nodeResolvePlugin = require('rollup-plugin-node-resolve');
 const { terser: rollupTerser } = require('rollup-plugin-terser');
 const babel = require('@babel/core');
 const babelFeaturesPlugin = require('@lwc/features/src/babel-plugin');
@@ -32,6 +33,7 @@ function rollupConfig(config) {
         inputOptions: {
             input,
             plugins: [
+                nodeResolvePlugin(),
                 prod && rollupReplace({ 'process.env.NODE_ENV': JSON.stringify('production') }),
                 rollupFeaturesPlugin(prod),
                 compatMode && rollupTypescriptPlugin({ target, typescript, include: ['/**/*.js'] }),
