@@ -171,28 +171,6 @@ defineProperties(HTMLElement.prototype, {
         writable: true,
         configurable: true,
     },
-    innerText: {
-        get(this: HTMLElement): string {
-            if (!featureFlags.ENABLE_ELEMENT_PATCH) {
-                if (isNodeShadowed(this) || isHostElement(this)) {
-                    return getInnerText(this);
-                }
-
-                return innerTextGetter.call(this);
-            }
-
-            // TODO [#1222]: remove global bypass
-            if (isGlobalPatchingSkipped(this)) {
-                return innerTextGetter.call(this);
-            }
-            return getInnerText(this);
-        },
-        set(this: HTMLElement, v: string) {
-            innerTextSetter.call(this, v);
-        },
-        enumerable: true,
-        configurable: true,
-    },
     focus: {
         value(this: HTMLElement) {
             // Typescript does not like it when you treat the `arguments` object as an array
@@ -204,6 +182,32 @@ defineProperties(HTMLElement.prototype, {
         configurable: true,
     },
 });
+
+// Note: In JSDOM innerText is not implemented: https://github.com/jsdom/jsdom/issues/1245
+if (innerTextGetter !== null && innerTextSetter !== null) {
+    defineProperty(HTMLElement.prototype, 'innerText', {
+        get(this: HTMLElement): string {
+            if (!featureFlags.ENABLE_ELEMENT_PATCH) {
+                if (isNodeShadowed(this) || isHostElement(this)) {
+                    return getInnerText(this);
+                }
+
+                return innerTextGetter!.call(this);
+            }
+
+            // TODO [#1222]: remove global bypass
+            if (isGlobalPatchingSkipped(this)) {
+                return innerTextGetter!.call(this);
+            }
+            return getInnerText(this);
+        },
+        set(this: HTMLElement, v: string) {
+            innerTextSetter!.call(this, v);
+        },
+        enumerable: true,
+        configurable: true,
+    });
+}
 
 // Note: Firefox does not have outerText, https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/outerText
 if (outerTextGetter !== null && outerTextSetter !== null) {

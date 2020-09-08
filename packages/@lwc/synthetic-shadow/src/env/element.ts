@@ -47,8 +47,12 @@ const lastElementChildGetter: (this: ParentNode) => Element | null = getOwnPrope
 
 const innerTextDescriptor = getOwnPropertyDescriptor(HTMLElement.prototype, 'innerText');
 
-const innerTextGetter: (this: Element) => string = innerTextDescriptor!.get!;
-const innerTextSetter: (this: Element, s: string) => void = innerTextDescriptor!.set!;
+const innerTextGetter: ((this: Element) => string) | null = innerTextDescriptor
+    ? innerTextDescriptor.get!
+    : null;
+const innerTextSetter: ((this: Element, s: string) => void) | null = innerTextDescriptor
+    ? innerTextDescriptor.set!
+    : null;
 
 // Note: Firefox does not have outerText, https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/outerText
 const outerTextDescriptor = getOwnPropertyDescriptor(HTMLElement.prototype, 'outerText');

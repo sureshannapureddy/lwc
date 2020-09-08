@@ -133,7 +133,7 @@ function innerTextCollectionSteps(node: Node): InnerTextItem[] {
 
         if (tagName === 'OPTION') {
             // For options, is hard to get the "rendered" text, let's use the original getter.
-            return [1, innerTextGetter.call(node), 1];
+            return [1, innerTextGetter!.call(node), 1];
         } else if (tagName === 'TEXTAREA') {
             return [];
         } else {
