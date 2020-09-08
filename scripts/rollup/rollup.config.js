@@ -11,7 +11,7 @@ const path = require('path');
 const babel = require('@babel/core');
 const typescript = require('typescript');
 const typescriptPlugin = require('rollup-plugin-typescript');
-const nodeResolvePlugin = require('rollup-plugin-node-resolve');
+const { default: nodeResolvePlugin } = require('@rollup/plugin-node-resolve');
 
 function rollupFeaturesPlugin() {
     const babelFeaturesPlugin = require('@lwc/features/src/babel-plugin');
