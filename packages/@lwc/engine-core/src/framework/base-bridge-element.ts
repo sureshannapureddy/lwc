@@ -19,12 +19,14 @@ import {
     isUndefined,
     seal,
     setPrototypeOf,
+    keys,
 } from '@lwc/shared';
 
 import { getAssociatedVM } from './vm';
 import { reactiveMembrane } from './membrane';
 import { HTMLElementConstructor } from './renderer';
 import { HTMLElementOriginalDescriptors } from './html-properties';
+import { getAttrNameFromPropName, isAttributeLocked } from './attributes';
 
 // A bridge descriptor is a descriptor whose job is just to get the component instance
 // from the element instance, and get the value or set a new value on the component.
@@ -104,10 +106,15 @@ export function HTMLBridgeElementFactory(
             value: HTMLBridgeElement,
         });
     }
+    // generating the hash table for attributes to avoid duplicate fields and facilitate validation
+    // and false positives in case of inheritance.
+    const attributeToPropMap: Record<string, string> = create(null);
+    const { attributeChangedCallback: superAttributeChangedCallback } = SuperClass.prototype as any;
     const descriptors: PropertyDescriptorMap = create(null);
     // expose getters and setters for each public props on the new Element Bridge
     for (let i = 0, len = props.length; i < len; i += 1) {
         const propName = props[i];
+        attributeToPropMap[getAttrNameFromPropName(propName)] = propName;
         descriptors[propName] = {
             get: createGetter(propName),
             set: createSetter(propName),
@@ -125,6 +132,43 @@ export function HTMLBridgeElementFactory(
         };
     }
     defineProperties(HTMLBridgeElement.prototype, descriptors);
+    // observable attributes
+    HTMLBridgeElement.prototype.attributeChangedCallback = function (
+        this: HTMLElement,
+        attrName: string,
+        oldValue: string,
+        newValue: string
+    ) {
+        if (oldValue === newValue) {
+            // Ignore same values.
+            return;
+        }
+        const propName = attributeToPropMap[attrName];
+        if (isUndefined(propName)) {
+            if (!isUndefined(superAttributeChangedCallback)) {
+                // delegate unknown attributes to the super.
+                superAttributeChangedCallback.apply(this, arguments);
+            }
+            return;
+        }
+        if (!isAttributeLocked(this, attrName)) {
+            // Ignore changes triggered by the engine itself during:
+            // * diffing when public props are attempting to reflect to the DOM
+            // * component via `this.setAttribute()`, should never update the prop
+            // Both cases, the setAttribute call is always wrapped by the unlocking of the
+            // attribute to be changed
+            return;
+        }
+        // Reflect attribute change to the corresponding property when changed from outside.
+        (this as any)[propName] = newValue;
+    };
+    // Specify attributes for which we want to reflect changes back to their corresponding
+    // properties via attributeChangedCallback.
+    defineProperty(HTMLBridgeElement, 'observedAttributes', {
+        get() {
+            return [...((SuperClass as any).observedAttributes || []), ...keys(attributeToPropMap)];
+        },
+    });
     return HTMLBridgeElement as HTMLElementConstructor;
 }
 
