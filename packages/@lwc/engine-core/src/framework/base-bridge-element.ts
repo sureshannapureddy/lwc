@@ -69,6 +69,50 @@ function createMethodCaller(methodName: string): (...args: any[]) => any {
     };
 }
 
+type AttributeChangedCallback = (
+    this: HTMLElement,
+    attrName: string,
+    oldValue: string,
+    newValue: string
+) => void;
+
+function createAttributeChangedCallback(
+    attributeToPropMap: Record<string, string>,
+    superAttributeChangedCallback: AttributeChangedCallback
+): AttributeChangedCallback {
+    return function attributeChangedCallback(
+        this: HTMLElement,
+        attrName: string,
+        oldValue: string,
+        newValue: string
+    ) {
+        if (oldValue === newValue) {
+            // Ignore same values.
+            return;
+        }
+        const propName = attributeToPropMap[attrName];
+        if (isUndefined(propName)) {
+            if (!isUndefined(superAttributeChangedCallback)) {
+                // delegate unknown attributes to the super.
+                // Typescript does not like it when you treat the `arguments` object as an array
+                // @ts-ignore type-mismatch
+                superAttributeChangedCallback.apply(this, arguments);
+            }
+            return;
+        }
+        if (!isAttributeLocked(this, attrName)) {
+            // Ignore changes triggered by the engine itself during:
+            // * diffing when public props are attempting to reflect to the DOM
+            // * component via `this.setAttribute()`, should never update the prop
+            // Both cases, the setAttribute call is always wrapped by the unlocking of the
+            // attribute to be changed
+            return;
+        }
+        // Reflect attribute change to the corresponding property when changed from outside.
+        (this as any)[propName] = newValue;
+    };
+}
+
 export interface HTMLElementConstructor {
     prototype: HTMLElement;
     new (): HTMLElement;
@@ -110,7 +154,13 @@ export function HTMLBridgeElementFactory(
     // and false positives in case of inheritance.
     const attributeToPropMap: Record<string, string> = create(null);
     const { attributeChangedCallback: superAttributeChangedCallback } = SuperClass.prototype as any;
+    const { observedAttributes: superObservedAttributes = [] } = SuperClass as any;
     const descriptors: PropertyDescriptorMap = create(null);
+    // creating a new attributeChangedCallback per bridge because they are bound to the corresponding
+    // map of attributes to props.
+    descriptors.attributeChangedCallback = {
+        value: createAttributeChangedCallback(attributeToPropMap, superAttributeChangedCallback),
+    };
     // expose getters and setters for each public props on the new Element Bridge
     for (let i = 0, len = props.length; i < len; i += 1) {
         const propName = props[i];
@@ -131,44 +181,14 @@ export function HTMLBridgeElementFactory(
             configurable: true,
         };
     }
-    defineProperties(HTMLBridgeElement.prototype, descriptors);
-    // observable attributes
-    HTMLBridgeElement.prototype.attributeChangedCallback = function (
-        this: HTMLElement,
-        attrName: string,
-        oldValue: string,
-        newValue: string
-    ) {
-        if (oldValue === newValue) {
-            // Ignore same values.
-            return;
-        }
-        const propName = attributeToPropMap[attrName];
-        if (isUndefined(propName)) {
-            if (!isUndefined(superAttributeChangedCallback)) {
-                // delegate unknown attributes to the super.
-                superAttributeChangedCallback.apply(this, arguments);
-            }
-            return;
-        }
-        if (!isAttributeLocked(this, attrName)) {
-            // Ignore changes triggered by the engine itself during:
-            // * diffing when public props are attempting to reflect to the DOM
-            // * component via `this.setAttribute()`, should never update the prop
-            // Both cases, the setAttribute call is always wrapped by the unlocking of the
-            // attribute to be changed
-            return;
-        }
-        // Reflect attribute change to the corresponding property when changed from outside.
-        (this as any)[propName] = newValue;
-    };
     // Specify attributes for which we want to reflect changes back to their corresponding
     // properties via attributeChangedCallback.
     defineProperty(HTMLBridgeElement, 'observedAttributes', {
         get() {
-            return [...((SuperClass as any).observedAttributes || []), ...keys(attributeToPropMap)];
+            return [...superObservedAttributes, ...keys(attributeToPropMap)];
         },
     });
+    defineProperties(HTMLBridgeElement.prototype, descriptors);
     return HTMLBridgeElement as HTMLElementConstructor;
 }
 
