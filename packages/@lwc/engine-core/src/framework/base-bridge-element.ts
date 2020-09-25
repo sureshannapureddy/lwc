@@ -156,11 +156,6 @@ export function HTMLBridgeElementFactory(
     const { attributeChangedCallback: superAttributeChangedCallback } = SuperClass.prototype as any;
     const { observedAttributes: superObservedAttributes = [] } = SuperClass as any;
     const descriptors: PropertyDescriptorMap = create(null);
-    // creating a new attributeChangedCallback per bridge because they are bound to the corresponding
-    // map of attributes to props.
-    descriptors.attributeChangedCallback = {
-        value: createAttributeChangedCallback(attributeToPropMap, superAttributeChangedCallback),
-    };
     // expose getters and setters for each public props on the new Element Bridge
     for (let i = 0, len = props.length; i < len; i += 1) {
         const propName = props[i];
@@ -181,6 +176,13 @@ export function HTMLBridgeElementFactory(
             configurable: true,
         };
     }
+    // creating a new attributeChangedCallback per bridge because they are bound to the corresponding
+    // map of attributes to props. We do this after all other props and methods to avoid the possibility
+    // of getting overrule by a class declaration in user-land, and we make it non-writable, non-configurable
+    // to preserve this definition.
+    descriptors.attributeChangedCallback = {
+        value: createAttributeChangedCallback(attributeToPropMap, superAttributeChangedCallback),
+    };
     // Specify attributes for which we want to reflect changes back to their corresponding
     // properties via attributeChangedCallback.
     defineProperty(HTMLBridgeElement, 'observedAttributes', {
