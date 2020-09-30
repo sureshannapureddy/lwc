@@ -213,7 +213,7 @@ export const renderer: Renderer<Node, Element> = {
         return node.isConnected;
     },
 
-    insertGlobalStylesheet(content: string): void {
+    insertGlobalStylesheet(content: string, styleSheetName: string): void {
         if (!isUndefined(globalStylesheets[content])) {
             return;
         }
@@ -223,6 +223,7 @@ export const renderer: Renderer<Node, Element> = {
         const elm = document.createElement('style');
         elm.type = 'text/css';
         elm.textContent = content;
+        elm.setAttribute('styleSheetName', styleSheetName);
 
         globalStylesheetsParentElement.appendChild(elm);
     },

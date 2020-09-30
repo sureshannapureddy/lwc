@@ -59,6 +59,13 @@ interface ShadowRootRecord {
     shadowRoot: SyntheticShadowRootInterface;
 }
 
+function getStyleSheets(root: SyntheticShadowRootInterface): [string?] {
+    const host = getHost(root);
+    const sheets = host.querySelector('style')?.getAttribute('styleSheetName');
+
+    return sheets ? [sheets] : [];
+}
+
 function getInternalSlot(root: SyntheticShadowRootInterface | Element): ShadowRootRecord {
     const record = getHiddenField(root, InternalSlot);
     if (isUndefined(record)) {
@@ -255,8 +262,8 @@ const ShadowRootDescriptors = {
     styleSheets: {
         enumerable: true,
         configurable: true,
-        get(): StyleSheetList {
-            throw new Error();
+        get(this: SyntheticShadowRootInterface): StyleSheetList {
+            return getStyleSheets(this);
         },
     },
 };
