@@ -59,11 +59,60 @@ interface ShadowRootRecord {
     shadowRoot: SyntheticShadowRootInterface;
 }
 
-function getStyleSheets(root: SyntheticShadowRootInterface): [string?] {
-    const host = getHost(root);
-    const sheets = host.querySelector('style')?.getAttribute('styleSheetName');
+interface StyleSheetList {
+    readonly length: number;
+    item(index: number): CSSStyleSheet | null;
+    [index: number]: CSSStyleSheet;
+}
 
-    return sheets ? [sheets] : [];
+function getStyleSheets(root: SyntheticShadowRootInterface): StyleSheetList {
+    const host = getHost(root);
+
+    const styleElements: Element[] = Array.from(host.getElementsByTagName('style'));
+    const sheetsObject: {
+        [index: number]: CSSStyleSheet;
+    } = {};
+
+    for (let i = 0, len = styleElements.length; i < len; i += 1) {
+        sheetsObject[i] = {
+            cssRules: {
+                length: 1,
+                item(): CSSRule | null {
+                    return null;
+                }
+            },
+            rules: {
+                length: 1,
+                item(): CSSRule | null {
+                    return null;
+                }
+            },
+            disabled: false,
+            href: null,
+            media: new MediaList,
+            ownerNode: styleElements[i],
+            ownerRule: null,
+            parentStyleSheet: null,
+            title: null,
+            type: 'text/css',
+            addRule: (): number => {
+                return Number();
+            },
+            deleteRule: () => {},
+            insertRule: (): number => {
+                return Number();
+            },
+            removeRule: () => {}
+        }
+    }
+
+    return {
+        ...sheetsObject,
+        length: styleElements.length,
+        item(index: number): CSSStyleSheet | null {
+            return sheetsObject[index];
+        }
+    }
 }
 
 function getInternalSlot(root: SyntheticShadowRootInterface | Element): ShadowRootRecord {
